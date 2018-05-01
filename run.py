@@ -1,8 +1,10 @@
 import os
 import sys
 import skimage
+import numpy as np
+import time
 
-from matplotlib import pyplot as plt
+
 from mrcnn.visualize import random_colors
 from skimage import io
 
@@ -25,31 +27,7 @@ if not os.path.exists(COCO_MODEL_PATH):
     utils.download_trained_weights(COCO_MODEL_PATH)
 
 # URL pointing to the image
-url = 'https://www.getnexar.com/images/challenge/middleEast/3.jpg'
-url = 'https://www.getnexar.com/images/challenge/middleEast/16.jpg'
-url = 'https://www.getnexar.com/images/challenge/middleEast/7.jpg'
-url = 'https://www.getnexar.com/images/challenge/middleEast/11.jpg'
-url = 'https://www.getnexar.com/images/challenge/China/2.jpg'
-url = 'https://www.getnexar.com/images/challenge/China/5.jpg'
-url = 'https://www.getnexar.com/images/challenge/China/12.jpg'
 url = 'https://www.getnexar.com/images/challenge/China/13.jpg'
-
-
-# url = 'https://i.imgur.com/liC9cCh.jpg'
-# url = 'https://www.getnexar.com/images/challenge/China/18.jpg'
-# url = 'https://www.getnexar.com/images/challenge/China/20.jpg'
-# url = 'https://www.getnexar.com/images/challenge/westUSA/2.jpg'
-# url = 'https://www.getnexar.com/images/challenge/westUSA/6.jpg'
-# url = 'https://www.getnexar.com/images/challenge/SouthAmerica/1.jpg'
-# url = 'https://www.getnexar.com/images/challenge/SouthAmerica/2.jpg'
-# url = 'https://www.getnexar.com/images/challenge/SouthAmerica/9.jpg'
-# url = 'https://www.getnexar.com/images/challenge/eastEurope/18.jpg'
-# url = 'https://www.getnexar.com/images/challenge/eastEurope/1.jpg'
-# url = 'https://www.getnexar.com/images/challenge/CentralAmerica/8.jpg'
-# url = 'https://www.getnexar.com/images/challenge/CentralAmerica/9.jpg'
-# url = 'https://www.getnexar.com/images/challenge/CentralAmerica/15.jpg'
-# url = 'https://www.getnexar.com/images/challenge/CentralAmerica/18.jpg'
-# url = 'https://www.getnexar.com/images/challenge/CentralAmerica/3.jpg'
 
 
 class InferenceConfig(coco.CocoConfig):
@@ -87,10 +65,38 @@ class_names = ['BG', 'person', 'bicycle', 'car', 'motorcycle', 'airplane',
                'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors',
                'teddy bear', 'hair drier', 'toothbrush']
 
-image = skimage.io.imread(url)
+vehicles = ['car', 'bus', 'train', 'truck', 'boat']
+living_things = ['person']
+
+original = skimage.io.imread(url)
+image = np.copy(original)
+
+# NOTE: change this to switch modes ('roi' or anything else)
+mode = 'roi'
+# mode = ''
+
+x1, x2, y1, y2 = 0, 0, 0, 0
+
+if mode == 'roi':
+    # region of interest
+    x1 = 306
+    x2 = x1 + 128
+    y1 = 197
+    y2 = y1 + 96
+
+    image = image[y1:y2, x1:x2]
+
+io.imshow(image)
+io.show()
+
+start = time.time()
 
 # Run detection
 results = model.detect([image], verbose=1)
+
+end = time.time()
+
+print("Inference time: {:.2f}s".format(end-start))
 
 # Visualize results
 r = results[0]
@@ -102,15 +108,27 @@ scores = r['scores']
 
 
 def meets_criteria(candidate_class, target_classes, candidate_score, target_score):
-    return candidate_class in target_classes and candidate_score >= target_score
+    return candidate_class in target_classes and candidate_score >= max(target_score, 0.70)
 
 
+# Number of instances
 N = boxes.shape[0]
 colors = random_colors(N)
 
-idx = [i for i in range(N) if meets_criteria(class_names[class_ids[i]], ['car'], scores[i], 0.75)]
+# Filter indices based on class name and score
+idx = [i for i in range(N) if meets_criteria(class_names[class_ids[i]], vehicles, scores[i], 0.70)]
 
 for i in idx:
     mask = masks[:, :, i]
-    io.imshow(visualize.convert_mask_to_image(image, mask, colors[i]))
-    plt.show()
+    mask_image = visualize.convert_mask_to_image(image, mask, colors[i])
+
+    if mode == 'roi':
+        # create an empty image with the same dimensions as the original one
+        mask_image_uncropped = np.zeros(original.shape, dtype=np.uint8)
+        # paste the mask onto the empty image
+        mask_image_uncropped[y1:y2, x1:x2] = mask_image
+        io.imshow(mask_image_uncropped)
+    else:
+        io.imshow(mask_image)
+
+    io.show()
