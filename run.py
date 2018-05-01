@@ -3,6 +3,7 @@ import sys
 import skimage
 
 from matplotlib import pyplot as plt
+from mrcnn.visualize import random_colors
 from skimage import io
 
 import mrcnn.model as modellib
@@ -24,7 +25,31 @@ if not os.path.exists(COCO_MODEL_PATH):
     utils.download_trained_weights(COCO_MODEL_PATH)
 
 # URL pointing to the image
-url = 'https://cdn.getnexar.com/wp-content/uploads/2016/10/27192207/greenTrafficLightInDrivingDirection1.jpg'
+url = 'https://www.getnexar.com/images/challenge/middleEast/3.jpg'
+url = 'https://www.getnexar.com/images/challenge/middleEast/16.jpg'
+url = 'https://www.getnexar.com/images/challenge/middleEast/7.jpg'
+url = 'https://www.getnexar.com/images/challenge/middleEast/11.jpg'
+url = 'https://www.getnexar.com/images/challenge/China/2.jpg'
+url = 'https://www.getnexar.com/images/challenge/China/5.jpg'
+url = 'https://www.getnexar.com/images/challenge/China/12.jpg'
+url = 'https://www.getnexar.com/images/challenge/China/13.jpg'
+
+
+# url = 'https://i.imgur.com/liC9cCh.jpg'
+# url = 'https://www.getnexar.com/images/challenge/China/18.jpg'
+# url = 'https://www.getnexar.com/images/challenge/China/20.jpg'
+# url = 'https://www.getnexar.com/images/challenge/westUSA/2.jpg'
+# url = 'https://www.getnexar.com/images/challenge/westUSA/6.jpg'
+# url = 'https://www.getnexar.com/images/challenge/SouthAmerica/1.jpg'
+# url = 'https://www.getnexar.com/images/challenge/SouthAmerica/2.jpg'
+# url = 'https://www.getnexar.com/images/challenge/SouthAmerica/9.jpg'
+# url = 'https://www.getnexar.com/images/challenge/eastEurope/18.jpg'
+# url = 'https://www.getnexar.com/images/challenge/eastEurope/1.jpg'
+# url = 'https://www.getnexar.com/images/challenge/CentralAmerica/8.jpg'
+# url = 'https://www.getnexar.com/images/challenge/CentralAmerica/9.jpg'
+# url = 'https://www.getnexar.com/images/challenge/CentralAmerica/15.jpg'
+# url = 'https://www.getnexar.com/images/challenge/CentralAmerica/18.jpg'
+# url = 'https://www.getnexar.com/images/challenge/CentralAmerica/3.jpg'
 
 
 class InferenceConfig(coco.CocoConfig):
@@ -69,9 +94,23 @@ results = model.detect([image], verbose=1)
 
 # Visualize results
 r = results[0]
-image = visualize.get_masked_image(image, r['rois'], r['masks'], r['class_ids'],
-                                   class_names, r['scores'])
 
-io.imshow(image)
+boxes = r['rois']
+masks = r['masks']
+class_ids = r['class_ids']
+scores = r['scores']
 
-plt.show()
+
+def meets_criteria(candidate_class, target_classes, candidate_score, target_score):
+    return candidate_class in target_classes and candidate_score >= target_score
+
+
+N = boxes.shape[0]
+colors = random_colors(N)
+
+idx = [i for i in range(N) if meets_criteria(class_names[class_ids[i]], ['car'], scores[i], 0.75)]
+
+for i in idx:
+    mask = masks[:, :, i]
+    io.imshow(visualize.convert_mask_to_image(image, mask, colors[i]))
+    plt.show()
