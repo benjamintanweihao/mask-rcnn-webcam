@@ -15,7 +15,7 @@ from mrcnn import utils, visualize
 ROOT_DIR = os.path.abspath("./")
 
 sys.path.append(os.path.join(ROOT_DIR, "samples/coco/"))  # To find local version
-import coco
+from coco import CocoConfig
 
 # Directory to save logs and trained model
 MODEL_DIR = os.path.join(ROOT_DIR, "logs")
@@ -30,7 +30,7 @@ if not os.path.exists(COCO_MODEL_PATH):
 url = 'https://www.getnexar.com/images/challenge/China/13.jpg'
 
 
-class InferenceConfig(coco.CocoConfig):
+class InferenceConfig(CocoConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     GPU_COUNT = 1
