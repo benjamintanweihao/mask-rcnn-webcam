@@ -1,22 +1,17 @@
 import os
 import sys
 
-import skimage
-import numpy as np
-import time
-
-
-from mrcnn.visualize import random_colors
-from skimage import io
+import cv2
 
 import mrcnn.model as modellib
 from mrcnn import utils, visualize
 
 # Root directory of the project
+from samples.coco.coco import CocoConfig
+
 ROOT_DIR = os.path.abspath("./")
 
 sys.path.append(os.path.join(ROOT_DIR, "samples/coco/"))  # To find local version
-import coco
 
 # Directory to save logs and trained model
 MODEL_DIR = os.path.join(ROOT_DIR, "logs")
@@ -27,11 +22,8 @@ COCO_MODEL_PATH = os.path.join(ROOT_DIR, "mask_rcnn_coco.h5")
 if not os.path.exists(COCO_MODEL_PATH):
     utils.download_trained_weights(COCO_MODEL_PATH)
 
-# URL pointing to the image
-url = 'https://www.getnexar.com/images/challenge/China/13.jpg'
 
-
-class InferenceConfig(coco.CocoConfig):
+class InferenceConfig(CocoConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     GPU_COUNT = 1
@@ -66,70 +58,29 @@ class_names = ['BG', 'person', 'bicycle', 'car', 'motorcycle', 'airplane',
                'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors',
                'teddy bear', 'hair drier', 'toothbrush']
 
-vehicles = ['car', 'bus', 'train', 'truck', 'boat']
-living_things = ['person']
+cap = cv2.VideoCapture(0)
 
-original = skimage.io.imread(url)
-image = np.copy(original)
+while True:
+    # Capture frame-by-frame
+    ret, frame = cap.read()
 
-# NOTE: change this to switch modes ('roi' or anything else)
-mode = 'roi'
-# mode = ''
+    # Our operations on the frame come here
 
-x1, x2, y1, y2 = 0, 0, 0, 0
+    results = model.detect([frame], verbose=1)
+    r = results[0]
 
-if mode == 'roi':
-    # region of interest
-    x1 = 306
-    x2 = x1 + 128
-    y1 = 197
-    y2 = y1 + 96
+    boxes = r['rois']
+    masks = r['masks']
+    class_ids = r['class_ids']
+    scores = r['scores']
 
-    image = image[y1:y2, x1:x2]
+    masked_image = visualize.get_masked_image(frame, boxes, masks, class_ids, class_names, scores)
 
-io.imshow(image)
-io.show()
+    # Display the resulting frame
+    cv2.imshow('', masked_image)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
 
-start = time.time()
-
-# Run detection
-results = model.detect([image], verbose=1)
-
-end = time.time()
-
-print("Inference time: {:.2f}s".format(end-start))
-
-# Visualize results
-r = results[0]
-
-boxes = r['rois']
-masks = r['masks']
-class_ids = r['class_ids']
-scores = r['scores']
-
-
-def meets_criteria(candidate_class, target_classes, candidate_score, target_score):
-    return candidate_class in target_classes and candidate_score >= max(target_score, 0.70)
-
-
-# Number of instances
-N = boxes.shape[0]
-colors = random_colors(N)
-
-# Filter indices based on class name and score
-idx = [i for i in range(N) if meets_criteria(class_names[class_ids[i]], vehicles, scores[i], 0.70)]
-
-for i in idx:
-    mask = masks[:, :, i]
-    mask_image = visualize.convert_mask_to_image(image, mask, colors[i])
-
-    if mode == 'roi':
-        # create an empty image with the same dimensions as the original one
-        mask_image_uncropped = np.zeros(original.shape, dtype=np.uint8)
-        # paste the mask onto the empty image
-        mask_image_uncropped[y1:y2, x1:x2] = mask_image
-        io.imshow(mask_image_uncropped)
-    else:
-        io.imshow(mask_image)
-
-    io.show()
+# When everything done, release the capture
+cap.release()
+cv2.destroyAllWindows()
