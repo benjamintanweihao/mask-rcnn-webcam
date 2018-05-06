@@ -2,9 +2,12 @@ import os
 import sys
 
 import cv2
+import time
 
 import mrcnn.model as modellib
 from mrcnn import utils, visualize
+import imutils
+
 
 # Root directory of the project
 from samples.coco.coco import CocoConfig
@@ -58,13 +61,13 @@ class_names = ['BG', 'person', 'bicycle', 'car', 'motorcycle', 'airplane',
                'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors',
                'teddy bear', 'hair drier', 'toothbrush']
 
-cap = cv2.VideoCapture(0)
+stream = cv2.VideoCapture(0)
 
 while True:
     # Capture frame-by-frame
-    ret, frame = cap.read()
-
-    # Our operations on the frame come here
+    grabbed, frame = stream.read()
+    if not grabbed:
+        break
 
     results = model.detect([frame], verbose=1)
     r = results[0]
@@ -74,7 +77,11 @@ while True:
     class_ids = r['class_ids']
     scores = r['scores']
 
+    # Run detection
+    start = time.time()
     masked_image = visualize.get_masked_image(frame, boxes, masks, class_ids, class_names, scores)
+    end = time.time()
+    print("Inference time: {:.2f}s".format(end - start))
 
     # Display the resulting frame
     cv2.imshow('', masked_image)
@@ -82,5 +89,5 @@ while True:
         break
 
 # When everything done, release the capture
-cap.release()
+stream.release()
 cv2.destroyAllWindows()
